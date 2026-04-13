@@ -87,12 +87,9 @@ Three things:
 
 1. **Your Ebioro Account key** (the `G...` of your wallet). Visible in the
    Ebioro app; also anywhere you've received funds to.
-2. **Your recovery credentials** — either:
-   - 12-word recovery phrase, **or**
-   - Stellar recovery secret key (`S...`)
-
-   Shown in the Ebioro app under **Profile → View recovery credentials**. The
-   secret key is derived from the phrase via SEP-0005 (`m/44'/148'/0'`).
+2. **Your Stellar recovery secret key** (`S...`). Shown in the Ebioro app under
+   **Profile → View recovery credentials**. (It is derived from the 12-word
+   recovery phrase via SEP-0005 (`m/44'/148'/0'`); both encode the same key.)
 3. **A destination Stellar account** (`G...`) that already exists on the
    network and has trustlines for every non-XLM asset you want to move. Add
    trustlines in Lobstr, Freighter, or wherever your destination wallet lives
@@ -102,7 +99,7 @@ Three things:
 
 1. Pick network (Testnet or Mainnet).
 2. Paste your Ebioro Account key.
-3. Paste your recovery phrase or secret.
+3. Paste your Stellar recovery secret key.
 4. Paste your destination account.
 5. The tool fetches both accounts from Horizon and validates that:
    - Your Account key exists
