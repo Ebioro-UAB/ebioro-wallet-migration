@@ -4,7 +4,6 @@ import { StrKey } from '@stellar/stellar-sdk';
 import {
     buildAndSubmitMigration,
     buildPreflight,
-    keypairFromMnemonic,
     keypairFromSecret,
     loadDestinationAccount,
     loadSourceAccount,
@@ -15,7 +14,6 @@ import {
 } from './migration';
 
 type Step = 'inputs' | 'preflight' | 'confirm' | 'submitting' | 'done' | 'error';
-type CredentialMode = 'mnemonic' | 'secret';
 
 export default function App() {
     const [step, setStep] = useState<Step>('inputs');
@@ -23,7 +21,6 @@ export default function App() {
 
     const [network, setNetwork] = useState<Network>('testnet');
     const [accountAddress, setAccountAddress] = useState<string>('');
-    const [credentialMode, setCredentialMode] = useState<CredentialMode>('mnemonic');
     const [credential, setCredential] = useState<string>('');
     const [destination, setDestination] = useState<string>('');
 
@@ -54,11 +51,7 @@ export default function App() {
             return;
         }
         if (!credential.trim()) {
-            setError(
-                credentialMode === 'mnemonic'
-                    ? 'Enter your 12-word recovery phrase.'
-                    : 'Enter your Stellar recovery secret key.',
-            );
+            setError('Enter your Stellar recovery secret key.');
             return;
         }
         if (!destination.trim()) {
@@ -76,10 +69,7 @@ export default function App() {
 
         setStep('preflight');
         try {
-            const kp =
-                credentialMode === 'mnemonic'
-                    ? keypairFromMnemonic(credential)
-                    : keypairFromSecret(credential);
+            const kp = keypairFromSecret(credential);
             const source = await loadSourceAccount(accountAddress.trim(), kp.publicKey(), network);
             const dest = await loadDestinationAccount(destination.trim(), network);
             const report = buildPreflight(source, dest);
@@ -133,8 +123,6 @@ export default function App() {
                     setNetwork={setNetwork}
                     accountAddress={accountAddress}
                     setAccountAddress={setAccountAddress}
-                    credentialMode={credentialMode}
-                    setCredentialMode={setCredentialMode}
                     credential={credential}
                     setCredential={setCredential}
                     destination={destination}
@@ -187,8 +175,6 @@ function InputsStep(props: {
     setNetwork: (n: Network) => void;
     accountAddress: string;
     setAccountAddress: (v: string) => void;
-    credentialMode: CredentialMode;
-    setCredentialMode: (m: CredentialMode) => void;
     credential: string;
     setCredential: (v: string) => void;
     destination: string;
@@ -235,51 +221,20 @@ function InputsStep(props: {
                 account holding your funds — not the recovery key.
             </p>
 
-            <label>Recovery credentials</label>
-            <div className="radio-group">
-                <label>
-                    <input
-                        type="radio"
-                        name="credMode"
-                        checked={props.credentialMode === 'mnemonic'}
-                        onChange={() => props.setCredentialMode('mnemonic')}
-                    />
-                    12-word recovery phrase
-                </label>
-                <label>
-                    <input
-                        type="radio"
-                        name="credMode"
-                        checked={props.credentialMode === 'secret'}
-                        onChange={() => props.setCredentialMode('secret')}
-                    />
-                    Stellar recovery secret key
-                </label>
-            </div>
-
-            {props.credentialMode === 'mnemonic' ? (
-                <textarea
-                    placeholder="word word word word word word word word word word word word"
-                    value={props.credential}
-                    onChange={(e) => props.setCredential(e.target.value)}
-                    autoCapitalize="off"
-                    autoCorrect="off"
-                    spellCheck={false}
-                />
-            ) : (
-                <input
-                    type="text"
-                    placeholder="SXXXXXX..."
-                    value={props.credential}
-                    onChange={(e) => props.setCredential(e.target.value)}
-                    autoCapitalize="off"
-                    autoCorrect="off"
-                    spellCheck={false}
-                />
-            )}
+            <label>Stellar recovery secret key</label>
+            <input
+                type="text"
+                placeholder="SXXXXXX..."
+                value={props.credential}
+                onChange={(e) => props.setCredential(e.target.value)}
+                autoCapitalize="off"
+                autoCorrect="off"
+                spellCheck={false}
+            />
             <p className="hint">
-                The key authorized to sign for your Account. Never leaves your
-                browser — used locally to sign the migration transaction.
+                The Stellar secret key (S...) authorized to sign for your Account.
+                Never leaves your browser — used locally to sign the migration
+                transaction.
             </p>
 
             <label>Destination Stellar account</label>
