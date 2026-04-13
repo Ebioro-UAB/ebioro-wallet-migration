@@ -154,6 +154,8 @@ export default function App() {
                     network={network}
                     destination={destination}
                     txHash={txHash}
+                    residualXlm={preflight?.finalReservedXlm ?? ''}
+                    sourceAddress={preflight?.source.address ?? ''}
                     onReset={reset}
                 />
             )}
@@ -316,9 +318,29 @@ function PreflightStep(props: {
                 ))}
             </ul>
 
+            {preflight.trustlinesToRemove.length > 0 && (
+                <>
+                    <h2>Trustlines to remove</h2>
+                    <ul className="balance-list">
+                        {preflight.trustlinesToRemove.map((tl) => (
+                            <li key={`${tl.assetCode}:${tl.assetIssuer}`} className="balance-item">
+                                <span>{tl.assetCode}</span>
+                                <span className="balance-status ok">frees 0.5 XLM</span>
+                            </li>
+                        ))}
+                    </ul>
+                    <p className="hint">
+                        Empty trustlines will be removed in the same transaction, freeing
+                        their reserved XLM so more can be transferred out.
+                    </p>
+                </>
+            )}
+
             <p className="hint">
-                Stellar requires your source account to keep{' '}
-                <strong>{preflight.reservedXlm} XLM</strong> as minimum reserve. Fees are about{' '}
+                After migration, your source account will keep{' '}
+                <strong>{preflight.finalReservedXlm} XLM</strong> as Stellar's minimum
+                reserve. This amount cannot be recovered — closing the account requires
+                Ebioro cooperation. Fees are about{' '}
                 <strong>{preflight.feeEstimateXlm} XLM</strong>.
             </p>
 
@@ -371,6 +393,8 @@ function DoneStep(props: {
     network: Network;
     destination: string;
     txHash: string;
+    residualXlm: string;
+    sourceAddress: string;
     onReset: () => void;
 }) {
     return (
@@ -397,6 +421,14 @@ function DoneStep(props: {
                     View transaction on Stellar Expert →
                 </a>
             </p>
+            {props.residualXlm && (
+                <p className="hint">
+                    Approximately <strong>{props.residualXlm} XLM</strong> remains in
+                    your source account as Stellar's minimum reserve. It cannot be
+                    recovered without closing the account, which requires Ebioro
+                    cooperation.
+                </p>
+            )}
             <div className="actions">
                 <button className="secondary" onClick={props.onReset}>
                     Start over
