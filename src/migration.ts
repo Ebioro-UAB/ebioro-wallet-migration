@@ -63,6 +63,7 @@ export interface BalanceInfo {
     assetCode: string;          // 'XLM' for native
     assetIssuer?: string;       // undefined for native
     balance: string;            // stringified decimal (stroops already scaled)
+    sponsor?: string;           // account paying the 0.5 XLM reserve for this trustline, if any
 }
 
 /**
@@ -121,6 +122,7 @@ export async function loadSourceAccount(
                 assetCode: b.asset_code,
                 assetIssuer: b.asset_issuer,
                 balance: b.balance,
+                sponsor: (b as any).sponsor,
             }];
         }
         // liquidity_pool_shares — not transferable via this tool; skip.
@@ -192,6 +194,7 @@ export interface PlannedTransfer {
 export interface TrustlineRef {
     assetCode: string;
     assetIssuer: string;
+    sponsored: boolean; // true if a third party pays the 0.5 XLM reserve — removal doesn't refund this account
 }
 
 const BASE_FEE_STROOPS = 100; // conservative per-op fee
@@ -220,6 +223,7 @@ export function buildPreflight(
         if (!b.assetIssuer) continue;
         const amount = parseFloat(b.balance);
         const key = `${b.assetCode}:${b.assetIssuer}`;
+        const sponsored = !!b.sponsor;
 
         if (amount > 0) {
             const transfer: PlannedTransfer = {
@@ -233,6 +237,7 @@ export function buildPreflight(
                 trustlinesToRemove.push({
                     assetCode: b.assetCode,
                     assetIssuer: b.assetIssuer,
+                    sponsored,
                 });
             } else {
                 // Asset gets stuck, trustline stays.
@@ -243,6 +248,7 @@ export function buildPreflight(
             trustlinesToRemove.push({
                 assetCode: b.assetCode,
                 assetIssuer: b.assetIssuer,
+                sponsored,
             });
         }
     }
@@ -252,8 +258,12 @@ export function buildPreflight(
     );
 
     const initialReserve = computeRequiredReserve(source);
-    // Each removed trustline frees one subentry (0.5 XLM).
-    const finalReserve = initialReserve - BASE_RESERVE_XLM * trustlinesToRemove.length;
+    // Only UNSPONSORED trustline removals refund 0.5 XLM to this account. A
+    // sponsored trustline's reserve goes back to the sponsor — the formula
+    // (subentries − num_sponsored) cancels it out, so this account's required
+    // reserve doesn't change.
+    const unsponsoredRemoved = trustlinesToRemove.filter((t) => !t.sponsored).length;
+    const finalReserve = initialReserve - BASE_RESERVE_XLM * unsponsoredRemoved;
 
     // Ops = payments + trustline removals + final XLM payment.
     const opCount = plan.length + trustlinesToRemove.length + 1;
