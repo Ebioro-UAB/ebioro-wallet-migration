@@ -325,7 +325,9 @@ function PreflightStep(props: {
                         {preflight.trustlinesToRemove.map((tl) => (
                             <li key={`${tl.assetCode}:${tl.assetIssuer}`} className="balance-item">
                                 <span>{tl.assetCode}</span>
-                                <span className="balance-status ok">frees 0.5 XLM</span>
+                                <span className="balance-status ok">
+                                    {tl.sponsored ? 'sponsored (no refund)' : 'frees 0.5 XLM'}
+                                </span>
                             </li>
                         ))}
                     </ul>
