@@ -175,7 +175,9 @@ export interface PreflightReport {
     destination: DestinationAccount;
     plan: PlannedTransfer[];
     leftBehind: PlannedTransfer[];
+    trustlinesToRemove: TrustlineRef[];
     reservedXlm: string;
+    finalReservedXlm: string;  // reserve after removing trustlines
     transferableXlm: string;
     hasEnoughXlm: boolean;
     feeEstimateXlm: string;
@@ -185,6 +187,11 @@ export interface PlannedTransfer {
     assetCode: string;
     assetIssuer?: string;
     amount: string;
+}
+
+export interface TrustlineRef {
+    assetCode: string;
+    assetIssuer: string;
 }
 
 const BASE_FEE_STROOPS = 100; // conservative per-op fee
@@ -206,21 +213,37 @@ export function buildPreflight(
 ): PreflightReport {
     const plan: PlannedTransfer[] = [];
     const leftBehind: PlannedTransfer[] = [];
+    const trustlinesToRemove: TrustlineRef[] = [];
 
     for (const b of source.balances) {
         if (b.assetType === 'native') continue;
+        if (!b.assetIssuer) continue;
         const amount = parseFloat(b.balance);
-        if (amount <= 0) continue;
         const key = `${b.assetCode}:${b.assetIssuer}`;
-        const transfer: PlannedTransfer = {
-            assetCode: b.assetCode,
-            assetIssuer: b.assetIssuer,
-            amount: b.balance,
-        };
-        if (destination.trustlines.has(key)) {
-            plan.push(transfer);
+
+        if (amount > 0) {
+            const transfer: PlannedTransfer = {
+                assetCode: b.assetCode,
+                assetIssuer: b.assetIssuer,
+                amount: b.balance,
+            };
+            if (destination.trustlines.has(key)) {
+                // Transferable → removable once drained.
+                plan.push(transfer);
+                trustlinesToRemove.push({
+                    assetCode: b.assetCode,
+                    assetIssuer: b.assetIssuer,
+                });
+            } else {
+                // Asset gets stuck, trustline stays.
+                leftBehind.push(transfer);
+            }
         } else {
-            leftBehind.push(transfer);
+            // Already empty → removable.
+            trustlinesToRemove.push({
+                assetCode: b.assetCode,
+                assetIssuer: b.assetIssuer,
+            });
         }
     }
 
@@ -228,15 +251,17 @@ export function buildPreflight(
         source.balances.find((b) => b.assetType === 'native')?.balance ?? '0',
     );
 
-    const reservedXlm = computeRequiredReserve(source);
+    const initialReserve = computeRequiredReserve(source);
+    // Each removed trustline frees one subentry (0.5 XLM).
+    const finalReserve = initialReserve - BASE_RESERVE_XLM * trustlinesToRemove.length;
 
-    // Estimate fees: base fee per op × (non-native payments + 1 XLM payment).
-    // Stroops → XLM: / 1e7.
-    const opCount = plan.length + 1;
+    // Ops = payments + trustline removals + final XLM payment.
+    const opCount = plan.length + trustlinesToRemove.length + 1;
     const feeEstimateXlm = (BASE_FEE_STROOPS * opCount) / 1e7;
 
-    // XLM we can actually send out.
-    const transferable = xlmBalance - reservedXlm - feeEstimateXlm;
+    // XLM we can actually send out, using the POST-removal reserve so we can
+    // free the XLM those subentries were holding.
+    const transferable = xlmBalance - finalReserve - feeEstimateXlm;
     const transferableXlm = transferable > 0 ? transferable.toFixed(7) : '0';
 
     return {
@@ -244,7 +269,9 @@ export function buildPreflight(
         destination,
         plan,
         leftBehind,
-        reservedXlm: reservedXlm.toFixed(7),
+        trustlinesToRemove,
+        reservedXlm: initialReserve.toFixed(7),
+        finalReservedXlm: finalReserve.toFixed(7),
         transferableXlm,
         hasEnoughXlm: transferable > 0,
         feeEstimateXlm: feeEstimateXlm.toFixed(7),
@@ -260,7 +287,7 @@ export async function buildAndSubmitMigration(
 
     const server = horizon(network);
     const sourceAccount = await server.loadAccount(preflight.source.address);
-    const opCount = preflight.plan.length + 1;
+    const opCount = preflight.plan.length + preflight.trustlinesToRemove.length + 1;
     const fee = String(BASE_FEE_STROOPS * opCount);
 
     const builder = new TransactionBuilder(sourceAccount, {
@@ -268,10 +295,9 @@ export async function buildAndSubmitMigration(
         networkPassphrase: networkPassphrase(network),
     });
 
+    // 1. Transfer each non-XLM asset → drains those trustlines.
     for (const transfer of preflight.plan) {
-        const asset = transfer.assetIssuer
-            ? new Asset(transfer.assetCode, transfer.assetIssuer)
-            : Asset.native();
+        const asset = new Asset(transfer.assetCode, transfer.assetIssuer!);
         builder.addOperation(
             Operation.payment({
                 destination: destinationAddress,
@@ -281,7 +307,19 @@ export async function buildAndSubmitMigration(
         );
     }
 
-    // Finally, the XLM payment.
+    // 2. Remove every drained or pre-existing-empty trustline (changeTrust
+    //    limit=0). Each one frees a subentry (0.5 XLM of reserve) so the
+    //    final XLM payment can send more out.
+    for (const tl of preflight.trustlinesToRemove) {
+        builder.addOperation(
+            Operation.changeTrust({
+                asset: new Asset(tl.assetCode, tl.assetIssuer),
+                limit: '0',
+            }),
+        );
+    }
+
+    // 3. Finally, the XLM payment using the post-removal transferable amount.
     builder.addOperation(
         Operation.payment({
             destination: destinationAddress,
