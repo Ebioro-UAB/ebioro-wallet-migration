@@ -25,14 +25,14 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '20'
-          cache: 'npm'
+          cache: 'yarn'
 
-      - run: npm ci
+      - run: yarn install --frozen-lockfile
 
-      - run: npm run typecheck
+      - run: yarn typecheck
 
       - name: Build
-        run: npm run build
+        run: yarn build
         env:
           # Override when using a custom domain (CNAME). Leave as-is for project pages.
           PAGES_BASE: /ebioro-wallet-migration/
