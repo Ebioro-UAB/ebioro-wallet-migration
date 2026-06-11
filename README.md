@@ -9,8 +9,8 @@ your browser.
 ## How the Ebioro wallet is structured
 
 The Ebioro wallet is **not a plain Stellar account**. It is a Stellar account
-with multiple signers and raised thresholds, so that no single party (not even
-Ebioro) can spend unilaterally.
+with multiple signers and raised thresholds, so that Ebioro can never spend
+or alter the account on its own.
 
 ```
                   ┌──────────────────────────────────────────┐
@@ -18,39 +18,56 @@ Ebioro) can spend unilaterally.
                   │       master key weight: 0               │
                   │                                          │
                   │   thresholds                             │
-                  │     low / med  = 20  (spend)             │
-                  │     high       = 30  (rotate signers)    │
+                  │     low / med / high  = 20               │
                   │                                          │
                   │   signers:                               │
                   │     ● device_key      weight 20          │
-                  │     ● recovery_key    weight 20          │
+                  │     ● backup_key      weight 20 (opt-in) │
+                  │     ● recovery_key    weight 10          │
                   │     ● ebioro_signer   weight 10          │
                   └──────────────────────────────────────────┘
 ```
 
 | Key | Where it lives | Purpose |
 |---|---|---|
-| **device_key** | Encrypted on the user's device (PIN) | Everyday signing inside the Ebioro app |
-| **recovery_key** | 12-word BIP-39 mnemonic in the user's iCloud / Google Drive backup. Viewable in the app under **Profile → View recovery credentials**. | Independent user-held key. Emergency exit. |
-| **ebioro_signer** | Held by Ebioro | Assisted recovery — required to rotate signers, but cannot spend alone |
+| **device_key** | Encrypted on the user's device (PIN / biometrics) | Everyday signing inside the Ebioro app |
+| **backup_key** (opt-in) | 12-word phrase generated in the app under **Profile → Backup phrase**. Shown once, you write it on paper. Ebioro never sees it. | Independent user-held key. Emergency exit. **What this tool uses.** |
+| **recovery_key** | 12-word BIP-39 mnemonic stored in the user's own iCloud / Google Drive backup | Assisted device replacement, together with the ebioro_signer (10 + 10 = 20) |
+| **ebioro_signer** | Hardware-secured key management system operated for Ebioro | Co-signs assisted recovery. Cannot do anything alone. |
 
 ### What each party can do
 
-| | Can spend (med = 20) | Can rotate signers (high = 30) |
+All thresholds are 20, so a weight-20 key acts alone and weight-10 keys must
+pair up:
+
+| | Can spend (med = 20) | Can change signers (high = 20) |
 |---|---|---|
-| **device_key alone** | ✓ | ✗ |
-| **recovery_key alone** | **✓ ← what this tool uses** | ✗ |
+| **device_key alone** | ✓ | ✓ |
+| **backup_key alone** | **✓ ← what this tool uses** | ✓ |
+| **recovery_key alone** | ✗ | ✗ |
 | **ebioro_signer alone** | ✗ | ✗ |
-| device + ebioro | ✓ | ✓ |
 | recovery + ebioro | ✓ | ✓ |
 
-The recovery key alone meets the medium threshold, so it can authorize
+The backup key alone meets the medium threshold, so it can authorize
 `payment` operations without any other signature. That's what makes
 independent migration possible.
 
-No one can rotate signers or close the account without Ebioro's cooperation
-(high threshold is 30). This tool does **not** merge or alter the account — it
-only sends payments out of it.
+Ebioro's signer (weight 10) is below every threshold: **Ebioro cannot spend,
+rotate signers, or close the account on its own** — alone or in any
+combination that doesn't include one of your keys.
+
+Note the inverse is not true: your weight-20 keys also meet the high
+threshold, so *you* could rotate signers or merge the account. This tool
+deliberately does neither — it only sends payments and leaves the account
+structure untouched (see below).
+
+> **Don't have a backup phrase?** The cloud recovery phrase (weight 10)
+> cannot spend on its own — the tool's preflight check will reject it.
+> - If you still have the app and your device: create the backup phrase first
+>   under **Profile → Backup phrase**, then use this tool.
+> - If you lost your device: use the app's assisted recovery (your cloud
+>   recovery phrase + Ebioro's co-signer) on a new device to restore access,
+>   then create the backup phrase.
 
 ## What this tool does
 
@@ -61,7 +78,7 @@ Builds a single Stellar transaction that:
 2. Transfers your XLM balance minus the required minimum reserve and the
    transaction fee.
 
-The transaction is signed entirely with your recovery key, in the browser, and
+The transaction is signed entirely with your backup key, in the browser, and
 submitted directly to Horizon. Ebioro's backend is never called.
 
 ### What stays behind
@@ -74,9 +91,10 @@ submitted directly to Horizon. Ebioro's backend is never called.
 
 ### What this tool deliberately does NOT do
 
-- **No `accountMerge`**: the account's high threshold is 30, and the recovery
-  key alone only has weight 20. Merging is intentionally blocked so that
-  neither Ebioro nor you can destroy the account's structure unilaterally.
+- **No `accountMerge`**: although a weight-20 key would technically meet the
+  high threshold, this tool never merges the account. Migrating your balances
+  while leaving the account structure intact keeps every other access path
+  (app, assisted recovery) working.
 - **No signer changes**: same reason.
 - **No DEX swaps**: you're responsible for setting up the destination wallet
   correctly (trustlines).
@@ -87,13 +105,16 @@ Three things:
 
 1. **Your Ebioro Account key** (the `G...` of your wallet). Visible in the
    Ebioro app; also anywhere you've received funds to.
-2. **Your recovery credentials** — either:
-   - The **12-word recovery phrase** you wrote on paper when you set up
-     "Recovery phrase" in the Ebioro app, **or**
+2. **Your backup credentials** — either:
+   - The **12-word backup phrase** you wrote on paper when you set up
+     **Backup phrase** in the Ebioro app, **or**
    - The **Stellar secret key** (`S...`) it derives, via SEP-0005
      (`m/44'/148'/0'`).
 
    Both encode the same key. The migration tool accepts either.
+
+   *(The 12-word phrase from your iCloud / Google Drive cloud backup is a
+   different, lower-weight key and will not pass the preflight check.)*
 3. **A destination Stellar account** (`G...`) that already exists on the
    network and has trustlines for every non-XLM asset you want to move. Add
    trustlines in Lobstr, Freighter, or wherever your destination wallet lives
@@ -103,15 +124,15 @@ Three things:
 
 1. Pick network (Testnet or Mainnet).
 2. Paste your Ebioro Account key.
-3. Choose your recovery format (12-word phrase or Stellar secret) and paste it.
+3. Choose your credential format (12-word phrase or Stellar secret) and paste it.
 4. Paste your destination account.
 5. The tool fetches both accounts from Horizon and validates that:
    - Your Account key exists
-   - Your recovery key is actually a signer on it, with weight ≥ medium threshold
+   - The key you provided is actually a signer on it, with weight ≥ medium threshold
    - The destination account exists
 6. Preflight report: shows which balances will transfer, which will be left
    behind (no trustline on destination), estimated fees, minimum reserve.
-7. Confirm → transaction is built, signed locally with the recovery key, and
+7. Confirm → transaction is built, signed locally with your key, and
    submitted to Horizon.
 8. Success screen with tx hash + Stellar Expert link.
 
