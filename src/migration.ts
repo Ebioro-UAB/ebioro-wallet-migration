@@ -32,7 +32,7 @@ export function horizon(network: Network): Horizon.Server {
 export function keypairFromMnemonic(mnemonic: string, accountIndex = 0): Keypair {
     const trimmed = mnemonic.trim().split(/\s+/).join(' ');
     if (!bip39.validateMnemonic(trimmed)) {
-        throw new Error('Invalid recovery phrase.');
+        throw new Error('Invalid backup phrase.');
     }
     const seed = bip39.mnemonicToSeedSync(trimmed).toString('hex');
     const { key } = derivePath(`m/44'/148'/${accountIndex}'`, seed);
@@ -68,7 +68,7 @@ export interface BalanceInfo {
 
 /**
  * Load the user's source (Ebioro) account and verify that the provided
- * recovery key is actually a signer on it with enough weight to spend alone.
+ * key is actually a signer on it with enough weight to spend alone.
  */
 export async function loadSourceAccount(
     sourceAddress: string,
@@ -94,17 +94,19 @@ export async function loadSourceAccount(
     );
     if (!recoverySigner || recoverySigner.weight <= 0) {
         throw new Error(
-            'The recovery key you provided is not a signer on this account. ' +
-            'Check that the Account key and the Recovery key match.',
+            'The key you provided is not a signer on this account. ' +
+            'Check that the Account key and the backup credentials match.',
         );
     }
 
     const medThreshold = account.thresholds.med_threshold;
     if (recoverySigner.weight < medThreshold) {
         throw new Error(
-            `The recovery key has weight ${recoverySigner.weight}, which is below ` +
+            `The key you provided has weight ${recoverySigner.weight}, which is below ` +
             `the account's medium threshold (${medThreshold}). It can't authorize ` +
-            'payments on its own.',
+            'payments on its own. If you entered the phrase from your iCloud / ' +
+            'Google Drive cloud backup, use your backup phrase instead (the one ' +
+            'you wrote down when you set up Backup phrase in the Ebioro app).',
         );
     }
 

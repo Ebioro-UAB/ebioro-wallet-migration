@@ -140,10 +140,10 @@ Three things:
 ## Development
 
 ```bash
-npm install
-npm run dev      # http://localhost:5173
-npm run build
-npm run preview
+yarn install
+yarn dev      # http://localhost:5173
+yarn build
+yarn preview
 ```
 
 ## Deployment
