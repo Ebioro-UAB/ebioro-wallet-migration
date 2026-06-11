@@ -280,7 +280,7 @@ function InputsStep(props: {
                 />
             )}
             <p className="hint">
-                The 12-word phrase you wrote down when you set up Backup phrase in
+                The 12-word phrase you wrote down when you set up the backup phrase in
                 the Ebioro app (not the phrase from your iCloud / Google Drive
                 cloud backup), or the Stellar secret key it derives. Never
                 leaves your browser — used locally to sign the migration
