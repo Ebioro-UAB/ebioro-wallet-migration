@@ -23,7 +23,7 @@ or alter the account on its own.
                   │   signers:                               │
                   │     ● device_key      weight 20          │
                   │     ● backup_key      weight 20 (opt-in) │
-                  │     ● recovery_key    weight 10          │
+                  │     ● cloud_key       weight 10          │
                   │     ● ebioro_signer   weight 10          │
                   └──────────────────────────────────────────┘
 ```
@@ -32,7 +32,7 @@ or alter the account on its own.
 |---|---|---|
 | **device_key** | Encrypted on the user's device (PIN / biometrics) | Everyday signing inside the Ebioro app |
 | **backup_key** (opt-in) | 12-word phrase generated in the app under **Profile → Backup phrase**. Shown once, you write it on paper. Ebioro never sees it. | Independent user-held key. Emergency exit. **What this tool uses.** |
-| **recovery_key** | 12-word BIP-39 mnemonic stored in the user's own iCloud / Google Drive backup | Assisted device replacement, together with the ebioro_signer (10 + 10 = 20) |
+| **cloud_key** | 12-word BIP-39 mnemonic stored in the user's own iCloud / Google Drive backup ("cloud recovery phrase") | Assisted device replacement, together with the ebioro_signer (10 + 10 = 20) |
 | **ebioro_signer** | Hardware-secured key management system operated for Ebioro | Co-signs assisted recovery. Cannot do anything alone. |
 
 ### What each party can do
@@ -44,17 +44,18 @@ pair up:
 |---|---|---|
 | **device_key alone** | ✓ | ✓ |
 | **backup_key alone** | **✓ ← what this tool uses** | ✓ |
-| **recovery_key alone** | ✗ | ✗ |
+| **cloud_key alone** | ✗ | ✗ |
 | **ebioro_signer alone** | ✗ | ✗ |
-| recovery + ebioro | ✓ | ✓ |
+| cloud + ebioro | ✓ | ✓ |
 
 The backup key alone meets the medium threshold, so it can authorize
 `payment` operations without any other signature. That's what makes
 independent migration possible.
 
 Ebioro's signer (weight 10) is below every threshold: **Ebioro cannot spend,
-rotate signers, or close the account on its own** — alone or in any
-combination that doesn't include one of your keys.
+rotate signers, or close the account on its own.** Every combination that
+reaches the threshold of 20 requires at least one key that you hold (device,
+backup, or cloud recovery phrase).
 
 Note the inverse is not true: your weight-20 keys also meet the high
 threshold, so *you* could rotate signers or merge the account. This tool
@@ -65,9 +66,9 @@ structure untouched (see below).
 > cannot spend on its own — the tool's preflight check will reject it.
 > - If you still have the app and your device: create the backup phrase first
 >   under **Profile → Backup phrase**, then use this tool.
-> - If you lost your device: use the app's assisted recovery (your cloud
->   recovery phrase + Ebioro's co-signer) on a new device to restore access,
->   then create the backup phrase.
+> - If you lost your device: install the Ebioro app on a new device and
+>   choose account recovery at sign-in (your cloud recovery phrase +
+>   Ebioro's co-signer restore your access), then create the backup phrase.
 
 ## What this tool does
 
