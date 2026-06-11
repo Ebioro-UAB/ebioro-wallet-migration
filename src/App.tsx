@@ -56,8 +56,8 @@ export default function App() {
         if (!credential.trim()) {
             setError(
                 credentialMode === 'mnemonic'
-                    ? 'Enter your 12-word recovery phrase.'
-                    : 'Enter your Stellar recovery secret key.',
+                    ? 'Enter your 12-word backup phrase.'
+                    : 'Enter your Stellar backup secret key.',
             );
             return;
         }
@@ -234,10 +234,10 @@ function InputsStep(props: {
             />
             <p className="hint">
                 The public key (G...) of your Ebioro wallet. This is the multi-sig
-                account holding your funds — not the recovery key.
+                account holding your funds — not the backup key.
             </p>
 
-            <label>Recovery credentials</label>
+            <label>Backup credentials</label>
             <div className="radio-group">
                 <label>
                     <input
@@ -246,7 +246,7 @@ function InputsStep(props: {
                         checked={props.credentialMode === 'mnemonic'}
                         onChange={() => props.setCredentialMode('mnemonic')}
                     />
-                    12-word recovery phrase
+                    12-word backup phrase
                 </label>
                 <label>
                     <input
@@ -255,7 +255,7 @@ function InputsStep(props: {
                         checked={props.credentialMode === 'secret'}
                         onChange={() => props.setCredentialMode('secret')}
                     />
-                    Stellar recovery secret key
+                    Stellar backup secret key
                 </label>
             </div>
 
@@ -280,8 +280,10 @@ function InputsStep(props: {
                 />
             )}
             <p className="hint">
-                The recovery credentials authorized to sign for your Account.
-                Never leaves your browser — used locally to sign the migration
+                The 12-word phrase you wrote down when you set up Backup phrase in
+                the Ebioro app (not the phrase from your iCloud / Google Drive
+                cloud backup), or the Stellar secret key it derives. Never
+                leaves your browser — used locally to sign the migration
                 transaction.
             </p>
 
@@ -333,7 +335,7 @@ function PreflightStep(props: {
                     {preflight.source.address}
                 </a>
                 <br />
-                Your recovery key has weight {preflight.source.recoveryKeyWeight} on this account.
+                The key you provided has weight {preflight.source.recoveryKeyWeight} on this account.
             </p>
 
             <h2>Balances</h2>
@@ -387,8 +389,8 @@ function PreflightStep(props: {
             <p className="hint">
                 After migration, your source account will keep{' '}
                 <strong>{preflight.finalReservedXlm} XLM</strong> as Stellar's minimum
-                reserve. This amount cannot be recovered — closing the account requires
-                Ebioro cooperation. Fees are about{' '}
+                reserve. This amount stays locked while the account exists — the tool
+                deliberately leaves your account open and intact. Fees are about{' '}
                 <strong>{preflight.feeEstimateXlm} XLM</strong>.
             </p>
 
