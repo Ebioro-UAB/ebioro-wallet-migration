@@ -4,3 +4,4 @@ dist
 *.log
 .vite
 *.tsbuildinfo
+package-lock.json
