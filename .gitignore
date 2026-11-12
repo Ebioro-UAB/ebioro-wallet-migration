@@ -5,3 +5,7 @@ dist
 .vite
 *.tsbuildinfo
 package-lock.json
+
+# Claude Code / MCP local state — never commit
+.claude/
+.mcp.json
